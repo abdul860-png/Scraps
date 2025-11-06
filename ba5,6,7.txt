@@ -1,0 +1,245 @@
+# ===============================
+# Business Analytics: PCA, kPCA, SVD on mtcars
+# ===============================
+
+# ---- 1) Install packages (run once; comment out after installation) ----
+# install.packages("ggplot2")
+# install.packages("kernlab")
+# install.packages("ggfortify")
+
+# ---- 2) Load libraries ----
+library(ggplot2)   # plotting
+library(kernlab)   # kernel PCA (kpca)
+library(ggfortify) # autoplot() support for prcomp objects
+
+# ---- 3) Load data & scale features ----
+data(mtcars)               # built-in dataset: 32 cars x 11 numeric vars
+df <- scale(mtcars)        # standardize columns: mean=0, sd=1 (returns a matrix)
+
+# ---- 4) PCA (linear) ----
+# prcomp() does PCA. Because df is already standardized above,
+# setting scale.=TRUE would scale again internally. To avoid double scaling,
+# we set scale.=FALSE here.
+pca_result <- prcomp(df, scale. = FALSE)
+
+# Quick variance summary: std dev, proportion of variance, cumulative variance
+summary(pca_result)
+
+# ---- 5) PCA biplot (loadings + scores) ----
+# autoplot() from ggfortify makes a quick biplot.
+# - data: (optional) the original data used for plotting aesthetics
+# - loadings: draw variable loadings (arrows)
+# - loadings.label: label those arrows with variable names
+# - loadings.colour/label.size: style for readability
+autoplot(
+  pca_result,
+  data = as.data.frame(df),
+  loadings = TRUE,
+  loadings.label = TRUE,
+  loadings.colour = "blue",
+  loadings.label.size = 4,
+  main = "PCA Biplot - mtcars (Enhanced)"
+)
+
+# ---- 6) Kernel PCA (nonlinear) ----
+# kpca() projects data nonlinearly using a kernel (here RBF/Gaussian).
+# - "~ ." means use all columns in the provided data frame.
+# - kernel = "rbfdot" selects the RBF kernel (good default for nonlinear structure).
+kpca_result <- kpca(~ ., data = as.data.frame(df), kernel = "rbfdot")
+
+# Rotated (projected) coordinates of observations in the kernel PC space
+kpca_df <- as.data.frame(rotated(kpca_result))
+
+# Add car names (row names of df are the car models)
+kpca_df$Car <- rownames(df)
+
+# Plot first two kernel PCs with point labels
+ggplot(kpca_df, aes(x = V1, y = V2, label = Car)) +
+  geom_point(color = "steelblue", size = 3) +
+  geom_text(vjust = -0.5, size = 3) +
+  theme_minimal() +
+  labs(
+    title = "Kernel PCA (First 2 Components) - mtcars",
+    x = "kPC1",
+    y = "kPC2"
+  )
+
+# ---- 7) Singular Value Decomposition (SVD) ----
+# SVD decomposes the (centered/scaled) data matrix df as: df = U * D * V^T
+# - U: left singular vectors (observation space)
+# - D: singular values
+# - V: right singular vectors (variable space)
+# NOTE: df is already standardized; SVD here is closely related to PCA.
+svd_result <- svd(df)
+
+# Print singular values (related to explained variance)
+print(svd_result$d)
+
+# Take first two left singular vectors (U1, U2) for a 2D view of observations
+svd_df <- data.frame(
+  U1  = svd_result$u[, 1],
+  U2  = svd_result$u[, 2],
+  Car = rownames(df)
+)
+
+# Plot SVD scores (U1 vs U2) with labels
+ggplot(svd_df, aes(x = U1, y = U2, label = Car)) +
+  geom_point(color = "darkgreen", size = 3) +
+  geom_text(vjust = -0.5, size = 3) +
+  theme_minimal() +
+  labs(
+    title = "SVD Components - mtcars",
+    x = "U1",
+    y = "U2"
+  )
+
+
+
+
+
+
+--------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+# ===============================
+# Business Analytics: Correlations, Bivariate/Multivariate Plots, MANOVA on iris
+# ===============================
+
+# ---- 1) Load data & prepare numeric features ----
+data(iris)                 # built-in dataset: 150 flowers, 4 numeric features + Species (factor)
+df <- iris[, -5]           # keep only the 4 numeric variables (drop Species column for cor/plots)
+
+# ---- 2) Correlation matrix ----
+# Compute Pearson correlations among the four numeric variables to understand linear relationships.
+cor_matrix <- cor(df)
+print(cor_matrix)
+
+# ---- 3) Simple bivariate scatter plot (Sepal.Length vs Petal.Length) ----
+# Base R plotting uses 'col' as a vector of colors.
+# Convert Species (a factor) to a color vector for consistent, readable colors.
+species_levels <- levels(iris$Species)
+species_cols   <- c("steelblue", "tomato", "darkgreen")  # set one color per species
+point_cols     <- species_cols[as.integer(iris$Species)] # map each row's species -> its color
+
+plot(
+  df$Sepal.Length, df$Petal.Length,
+  col   = point_cols,
+  pch   = 19,
+  main  = "Bivariate Analysis: Sepal Length vs Petal Length",
+  xlab  = "Sepal Length",
+  ylab  = "Petal Length"
+)
+
+# Add a legend so the color mapping is explicit.
+legend(
+  "topleft",
+  legend = species_levels,
+  col    = species_cols,
+  pch    = 19,
+  bty    = "n",
+  title  = "Species"
+)
+
+# ---- 4) Multivariate scatterplot matrix (pairs plot) ----
+# Visual scan of all pairwise relationships; colors encode species.
+pairs(
+  df,
+  col   = point_cols,
+  pch   = 19,
+  main  = "Multivariate Scatterplot Matrix (iris)"
+)
+
+# ---- 5) MANOVA: Do species differ on the joint mean vector of the 4 measurements? ----
+# Response is a matrix with the four numeric variables; predictor is Species.
+fit <- manova(
+  cbind(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width) ~ Species,
+  data = iris
+)
+
+# Overall multivariate test (default = Pillai trace; also prints Wilks, Hotelling-Lawley, Roy)
+summary(fit)
+
+# ---- 6) (Optional) Univariate ANOVAs for each outcome ----
+# If the multivariate test is significant, check which variables differ by Species.
+# This decomposes MANOVA into separate ANOVAs with the same model.
+summary.aov(fit)
+
+# ---- 7) (Optional) Quick interpretation helpers ----
+# Proportion of significant univariate effects can hint which measurements drive group separation.
+# Post-hoc pairwise comparisons or linear discriminant analysis (LDA) can be added if needed.
+
+
+
+
+
+--------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+# ===============================
+# Business Analytics: Basic Data Visualization - airquality Dataset
+# ===============================
+
+# ---- 1) Install and load ggplot2 (Run install only once) ----
+# install.packages("ggplot2")   # Uncomment this line if ggplot2 is not installed
+library(ggplot2)                # Load the ggplot2 package for data visualization
+
+# ---- 2) Load and clean the dataset ----
+data(airquality)                # Load the built-in airquality dataset
+df <- na.omit(airquality)       # Remove rows with missing values (NA)
+
+# ---- 3) Histogram of Temperature ----
+hist(
+  df$Temp,                      # Temperature variable
+  main = "Histogram of Temperature", # Title of the histogram
+  col = "skyblue",              # Fill color for bars
+  border = "white",             # Color of bar borders
+  xlab = "Temperature"          # Label for x-axis
+)
+
+# ---- 4) Boxplot of Ozone ----
+boxplot(
+  df$Ozone,                     # Ozone concentration variable
+  main = "Boxplot of Ozone",    # Title of the boxplot
+  col = "orange"                # Fill color for the box
+)
+
+# ---- 5) Density Plot of Wind Speed ----
+plot(
+  density(df$Wind),             # Calculate and plot smooth density of wind speed
+  main = "Density of Wind Speed",# Title
+  col = "darkgreen",            # Line color
+  lwd = 2                       # Line width for better visibility
+)
+
+# ---- 6) Bar Plot of Month Counts ----
+month_count <- table(df$Month)  # Count how many observations exist for each month
+barplot(
+  month_count,                  # Data to plot
+  main = "Barplot of Months",   # Title
+  col = c("red", "blue", "green", "purple", "cyan")  # Colors for bars
+)
+
+# ---- 7) Scatter Plot using ggplot2 (Ozone vs Temperature) ----
+ggplot(
+  df,                           # Use cleaned dataset
+  aes(x = Temp, y = Ozone, color = factor(Month))  # Map Temp (x), Ozone (y), color by Month
+) +
+  geom_point(size = 3) +        # Add points with size 3
+  theme_minimal() +             # Use minimal theme for clean look
+  labs(
+    title = "Scatter Plot (Ozone vs Temp by Month)", # Title
+    x = "Temperature",          # X-axis label
+    y = "Ozone Level",          # Y-axis label
+    color = "Month"             # Legend title
+  )
+------------------------------------------------------------------------------------------------
