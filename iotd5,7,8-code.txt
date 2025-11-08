@@ -1,0 +1,242 @@
+EXP 5 CODE IOT
+
+#include <WiFi.h>         // Wi-Fi library for ESP32
+#include <HTTPClient.h>   // HTTP client library
+
+// Replace these with your WiFi credentials
+const char* ssid     = "Wokwi-GUEST";  // Wokwi virtual Wi-Fi
+const char* password = "";             // No password
+
+void setup() {
+  // Initialize Serial Monitor for debugging
+  Serial.begin(115200);
+  delay(1000);
+
+  // Start connecting to WiFi
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+
+  // Wait until the ESP32 connects to WiFi
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting...");
+  }
+  Serial.println("WiFi Connected!");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());  // Print local IP
+
+  // ----------------------
+  // HTTP GET Request
+  // ----------------------
+  HTTPClient http;  
+  http.begin("http://jsonplaceholder.typicode.com/posts/1"); 
+  // Example test API for GET
+
+  Serial.println("Sending HTTP GET request...");
+  int httpCode = http.GET();  // Perform GET request
+
+  if (httpCode > 0) { 
+    // Check for valid response
+    Serial.printf("GET Response Code: %d\n", httpCode);
+    String payload = http.getString();
+    Serial.println("GET Response:");
+    Serial.println(payload);
+  } else {
+    Serial.printf("GET request failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+  http.end();  // Free resources
+
+  // ----------------------
+  // HTTP POST Request
+  // ----------------------
+  HTTPClient httpPost;
+  httpPost.begin("http://jsonplaceholder.typicode.com/posts");  
+  // Example test API for POST
+  httpPost.addHeader("Content-Type", "application/json"); // Set header
+
+  // Example JSON payload to send
+  String postData = "{\"title\":\"ESP32\",\"body\":\"Hello from ESP32!\",\"userId\":1}";
+
+  Serial.println("Sending HTTP POST request...");
+  int postCode = httpPost.POST(postData); // Perform POST request
+
+  if (postCode > 0) {
+    // Check for valid response
+    Serial.printf("POST Response Code: %d\n", postCode);
+    String response = httpPost.getString();
+    Serial.println("POST Response:");
+    Serial.println(response);
+  } else {
+    Serial.printf("POST request failed, error: %s\n", httpPost.errorToString(postCode).c_str());
+  }
+  httpPost.end();  // Free resources
+}
+
+void loop() {
+  // Empty - requests handled in setup()
+}
+
+
+------------------------------------------------------------------
+
+
+EXP 7 CODE IOT
+
+#include <Arduino.h>  // Required for ESP32 Arduino framework
+
+// ----------------------
+// Task 1: Runs every 1 second
+// ----------------------
+void Task1(void *pvParameters) {
+  while (1) {
+    Serial.println("Task 1 is running");
+    vTaskDelay(1000 / portTICK_PERIOD_MS); // Delay 1 second
+  }
+}
+
+// ----------------------
+// Task 2: Runs every 0.5 seconds
+// ----------------------
+void Task2(void *pvParameters) {
+  while (1) {
+    Serial.println("Task 2 is running");
+    vTaskDelay(500 / portTICK_PERIOD_MS); // Delay 0.5 seconds
+  }
+}
+
+void setup() {
+  // Initialize Serial Monitor
+  Serial.begin(115200);
+  delay(1000); // Give Serial time to start
+
+  // ----------------------
+  // Create FreeRTOS Tasks
+  // ----------------------
+  // Parameters:
+  // 1. Task function
+  // 2. Task name (for debugging)
+  // 3. Stack size (in words, not bytes)
+  // 4. Task input parameters (NULL if not needed)
+  // 5. Priority (higher number = higher priority)
+  // 6. Task handle (NULL if not needed)
+  
+  xTaskCreate(Task1, "Task 1", 1000, NULL, 1, NULL);  // Create Task1
+  xTaskCreate(Task2, "Task 2", 1000, NULL, 1, NULL);  // Create Task2
+}
+
+void loop() {
+  // Empty - FreeRTOS handles task scheduling
+}
+
+
+
+
+
+----------------------------------------------------------------------
+
+
+
+
+
+
+EXP 8 CODE IOT
+
+
+
+#include <Arduino.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+// ----------------------
+// BLE Definitions (Simulation Safe)
+// ----------------------
+#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b" 
+#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8" 
+
+BLECharacteristic *pCharacteristic;
+bool deviceConnected = false;
+
+// ----------------------
+// BLE Callback Class (simulated connect/disconnect)
+// ----------------------
+class MyServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer* pServer) {
+    deviceConnected = true;
+    Serial.println("[BLE] Device connected (simulated in Wokwi)");
+  }
+  void onDisconnect(BLEServer* pServer) {
+    deviceConnected = false;
+    Serial.println("[BLE] Device disconnected (simulated in Wokwi)");
+  }
+};
+
+// ----------------------
+// Task 1: Send BLE notification every 1 second
+// ----------------------
+void Task1(void *pvParameters) {
+  while (1) {
+    if (deviceConnected) {
+      String msg = "Hello from ESP32 (simulated)!";
+      pCharacteristic->setValue(msg.c_str());
+      pCharacteristic->notify();  
+      Serial.println("[Task1] BLE notification sent: " + msg);
+    } else {
+      Serial.println("[Task1] Waiting for device connection...");
+    }
+    vTaskDelay(1000 / portTICK_PERIOD_MS); 
+  }
+}
+
+// ----------------------
+// Task 2: Background Serial print
+// ----------------------
+void Task2(void *pvParameters) {
+  while (1) {
+    Serial.println("[Task2] Running background task");
+    vTaskDelay(500 / portTICK_PERIOD_MS); 
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("[Setup] Starting ESP32 BLE Server (Wokwi Simulation)");
+
+  // ----------------------
+  // Initialize BLE stack
+  // ----------------------
+  BLEDevice::init("ESP32-BLE-SIM");   // Device name (simulated)
+  BLEServer *pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+
+  pCharacteristic = pService->createCharacteristic(
+                      CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ   | 
+                      BLECharacteristic::PROPERTY_WRITE  |
+                      BLECharacteristic::PROPERTY_NOTIFY |
+                      BLECharacteristic::PROPERTY_INDICATE
+                    );
+  pCharacteristic->addDescriptor(new BLE2902());
+
+  pService->start();
+  pServer->getAdvertising()->start();
+
+  Serial.println("[BLE] Advertising started (not visible in Wokwi)");
+
+  // ----------------------
+  // Start FreeRTOS tasks
+  // ----------------------
+  xTaskCreate(Task1, "Task 1", 2000, NULL, 1, NULL);
+  xTaskCreate(Task2, "Task 2", 2000, NULL, 1, NULL);
+}
+
+void loop() {
+  // Nothing here, FreeRTOS + BLE run in background
+}
+
+
